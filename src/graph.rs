@@ -1,4 +1,5 @@
 use crate::Node;
+use crate::Node::LogicBlock;
 use std::collections::HashMap;
 use std::collections::VecDeque;
 
@@ -31,7 +32,9 @@ impl Graph {
         for link in links {
             assert!(self.nodes.contains_key(&link.0));
             assert!(self.nodes.contains_key(&link.1));
-            self.nodes.get_mut(&link.0).unwrap().children.push(link.1);
+            match self.nodes.get_mut(&link.0).unwrap() {
+                LogicBlock(node) => node.children.push(link.1),
+            }
         }
     }
 }
