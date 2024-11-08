@@ -107,8 +107,8 @@ C value_required = 0011
 
 to store bit values there is storing block whose blocks start with a '^' as a convention
 and must be connect to two cells
-1. one with a '>' to get the value from  
-2. one with a '-' horizontally or '|' vertically to know if it should take the value (can only have one)  
+1. one with a '>' to get the value from (source)
+2. one with a '-' horizontally or '|' vertically to know if it should take the value (can only have one) (button)
 
 |    |    |    |
 |----|----|----|
