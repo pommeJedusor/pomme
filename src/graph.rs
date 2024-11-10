@@ -109,7 +109,7 @@ impl Graph {
         let node = self.get_mut_node(node).expect("node not found");
         match node {
             Node::LogicBlock(node) => {
-                if !node.is_on() || node.get_value() != 0 {
+                if !node.is_on() {
                     return;
                 }
                 for child in node.children.clone() {
