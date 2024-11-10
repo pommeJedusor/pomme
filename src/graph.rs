@@ -1,3 +1,4 @@
+use crate::storing_block;
 use crate::LogicBlock;
 use crate::Node;
 use crate::StoringBlock;
@@ -36,16 +37,29 @@ impl Graph {
     /// do not work with button links for storing block
     /// if the second one is a storing block takes the first one as the source
     pub fn insert_links(&mut self, links: Vec<(NodeId, NodeId)>) {
-        //TODO logical block must point toward storing block as the reversed is true
         for link in links {
             assert!(self.nodes.contains_key(&link.0));
             assert!(self.nodes.contains_key(&link.1));
-            match self.nodes.get_mut(&link.1).unwrap() {
-                Node::StoringBlock(node) => node.source = link.1,
-                Node::LogicBlock(_) => match self.nodes.get_mut(&link.0).unwrap() {
-                    Node::StoringBlock(node) => node.children.push(link.1),
-                    Node::LogicBlock(node) => node.children.push(link.1),
-                },
+
+            let is_first_storing_block =
+                matches!(self.nodes.get(&link.0).unwrap(), Node::StoringBlock(_));
+            let is_second_storing_block =
+                matches!(self.nodes.get(&link.1).unwrap(), Node::StoringBlock(_));
+            assert!(!is_first_storing_block || !is_second_storing_block);
+
+            if is_first_storing_block {
+                let first_node = self.get_mut_storing_block(link.0).unwrap();
+                first_node.source = link.1;
+                let second_node = self.get_mut_logical_block(link.1).unwrap();
+                second_node.children.push(link.0)
+            } else if is_second_storing_block {
+                let first_node = self.get_mut_logical_block(link.0).unwrap();
+                first_node.children.push(link.1);
+                let second_node = self.get_mut_storing_block(link.1).unwrap();
+                second_node.source = link.0
+            } else {
+                let first_node = self.get_mut_logical_block(link.0).unwrap();
+                first_node.children.push(link.1);
             }
         }
     }
@@ -65,14 +79,11 @@ impl Graph {
             } else {
                 (link.1, link.0)
             };
-            match self.nodes.get_mut(&storing_block_link).unwrap() {
-                Node::StoringBlock(node) => node.button_node = logical_block_link,
-                _ => unreachable!(),
-            };
-            match self.nodes.get_mut(&logical_block_link).unwrap() {
-                Node::LogicBlock(node) => node.children.push(storing_block_link),
-                _ => unreachable!(),
-            };
+
+            let storing_block = self.get_mut_storing_block(storing_block_link).unwrap();
+            storing_block.button_node = logical_block_link;
+            let logical_block = self.get_mut_logical_block(logical_block_link).unwrap();
+            logical_block.children.push(storing_block_link);
         }
     }
 
@@ -85,19 +96,24 @@ impl Graph {
     pub fn get_logical_block(&self, key: u32) -> Option<&LogicBlock> {
         match self.nodes.get(&key)? {
             Node::LogicBlock(node) => Some(node),
-            Node::StoringBlock(_) => {
-                assert!(false);
-                unreachable!();
-            }
+            Node::StoringBlock(_) => None,
         }
     }
-
     pub fn get_storing_block(&self, key: u32) -> Option<&StoringBlock> {
         match self.nodes.get(&key)? {
-            Node::LogicBlock(_) => {
-                assert!(false);
-                unreachable!();
-            }
+            Node::LogicBlock(_) => None,
+            Node::StoringBlock(node) => Some(node),
+        }
+    }
+    pub fn get_mut_logical_block(&mut self, key: u32) -> Option<&mut LogicBlock> {
+        match self.nodes.get_mut(&key)? {
+            Node::LogicBlock(node) => Some(node),
+            Node::StoringBlock(_) => None,
+        }
+    }
+    pub fn get_mut_storing_block(&mut self, key: u32) -> Option<&mut StoringBlock> {
+        match self.nodes.get_mut(&key)? {
+            Node::LogicBlock(_) => None,
             Node::StoringBlock(node) => Some(node),
         }
     }
@@ -170,11 +186,11 @@ impl Graph {
         if action.is_none() {
             return;
         }
-        let action = action.unwrap();
-        match action.0 {
-            NodeAction::InitNode => self.init_node(action.1),
-            NodeAction::IncreaseValue => self.increase_value(action.1),
-            NodeAction::DecreaseValue => self.decrease_value(action.1),
+        let (action, node) = action.unwrap();
+        match action {
+            NodeAction::InitNode => self.init_node(node),
+            NodeAction::IncreaseValue => self.increase_value(node),
+            NodeAction::DecreaseValue => self.decrease_value(node),
         }
     }
 
