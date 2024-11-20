@@ -1,4 +1,3 @@
-use crate::storing_block;
 use crate::LogicBlock;
 use crate::Node;
 use crate::StoringBlock;
@@ -49,14 +48,7 @@ impl Graph {
 
             if is_first_storing_block {
                 let first_node = self.get_mut_storing_block(link.0).unwrap();
-                first_node.source = link.1;
-                let second_node = self.get_mut_logical_block(link.1).unwrap();
-                second_node.children.push(link.0)
-            } else if is_second_storing_block {
-                let first_node = self.get_mut_logical_block(link.0).unwrap();
                 first_node.children.push(link.1);
-                let second_node = self.get_mut_storing_block(link.1).unwrap();
-                second_node.source = link.0
             } else {
                 let first_node = self.get_mut_logical_block(link.0).unwrap();
                 first_node.children.push(link.1);
@@ -121,8 +113,8 @@ impl Graph {
     /// only when initialising the graph
     /// add add increasevalue action to all children if the node is on and if it hasn't been
     /// explored during the initialisation (if the value is 0)
-    fn init_node(&mut self, node: u32) {
-        let node = self.get_mut_node(node).expect("node not found");
+    fn init_node(&mut self, node_id: u32) {
+        let node = self.get_mut_node(node_id).expect("node not found");
         match node {
             Node::LogicBlock(node) => {
                 if !node.is_on() {
@@ -133,12 +125,40 @@ impl Graph {
                         .push_back((NodeAction::IncreaseValue, child));
                 }
             }
-            Node::StoringBlock(_) => todo!(),
+            Node::StoringBlock(node) => {
+                let was_on = node.is_on;
+                let is_on = self.update_storing_node_value(node_id);
+                let node = self.get_storing_block(node_id).expect("node not found");
+                if was_on != is_on {
+                    for child in node.children.clone() {
+                        self.actions_queue.push_back((
+                            if is_on {
+                                NodeAction::IncreaseValue
+                            } else {
+                                NodeAction::DecreaseValue
+                            },
+                            child,
+                        ));
+                    }
+                }
+            }
         }
     }
 
-    fn increase_value(&mut self, node: u32) {
-        let node = self.get_mut_node(node).expect("node not found");
+    fn update_storing_node_value(&mut self, node_id: u32) -> bool {
+        let node = self.get_storing_block(node_id).unwrap();
+        let is_source_on = self.get_logical_block(node.source).unwrap().is_on();
+        let is_button_node_on = self.get_logical_block(node.button_node).unwrap().is_on();
+        let node = self.get_mut_storing_block(node_id).unwrap();
+        println!("source: {is_source_on}\nbutton: {is_button_node_on}\n");
+        if is_button_node_on {
+            node.is_on = is_source_on;
+        }
+        node.is_on
+    }
+
+    fn increase_value(&mut self, node_id: u32) {
+        let node = self.get_mut_node(node_id).expect("node not found");
         match node {
             Node::LogicBlock(node) => {
                 let was_on = node.is_on();
@@ -155,12 +175,14 @@ impl Graph {
                     self.actions_queue.push_back((action, child));
                 }
             }
-            Node::StoringBlock(_) => todo!(),
+            Node::StoringBlock(_) => {
+                self.update_storing_node_value(node_id);
+            }
         }
     }
 
-    fn decrease_value(&mut self, node: u32) {
-        let node = self.get_mut_node(node).expect("node not found");
+    fn decrease_value(&mut self, node_id: u32) {
+        let node = self.get_mut_node(node_id).expect("node not found");
         match node {
             Node::LogicBlock(node) => {
                 let was_on = node.is_on();
@@ -177,7 +199,9 @@ impl Graph {
                     self.actions_queue.push_back((action, child));
                 }
             }
-            Node::StoringBlock(_) => todo!(),
+            Node::StoringBlock(_) => {
+                self.update_storing_node_value(node_id);
+            }
         }
     }
 
@@ -247,5 +271,279 @@ mod tests {
         assert!(graph.get_logical_block(1).unwrap().is_on());
         assert!(graph.get_logical_block(2).unwrap().is_on());
         assert!(graph.get_logical_block(3).unwrap().is_on());
+    }
+
+    #[test]
+    fn binary_and() {
+        /*
+         * A > c
+         * B > c
+         * A -> B = lamp
+         * C = AND
+         * */
+        let mut graph = Graph::new();
+        let mut nodes = Vec::new();
+        let input_a = Node::LogicBlock(LogicBlock::new(0b11111, vec![]));
+        nodes.push((input_a, 1));
+        let input_b = Node::LogicBlock(LogicBlock::new(0b11111, vec![]));
+        nodes.push((input_b, 2));
+        // output (binary or)
+        let output = Node::LogicBlock(LogicBlock::new(0b00100, vec![]));
+        nodes.push((output, 3));
+        graph.insert_nodes(nodes);
+        graph.insert_links(vec![(1, 3), (2, 3)]);
+        assert!(graph.get_logical_block(1).unwrap().children == [3]);
+        assert!(graph.get_logical_block(2).unwrap().children == [3]);
+        assert!(graph.get_logical_block(3).unwrap().children == []);
+        // add the init actions
+        graph.init_graph_state();
+        assert!(graph.get_logical_block(1).unwrap().get_value() == 0);
+        assert!(graph.get_logical_block(2).unwrap().get_value() == 0);
+        assert!(graph.get_logical_block(3).unwrap().get_value() == 2);
+        assert!(graph.get_logical_block(1).unwrap().is_on());
+        assert!(graph.get_logical_block(2).unwrap().is_on());
+        assert!(graph.get_logical_block(3).unwrap().is_on());
+    }
+
+    #[test]
+    fn binary_long() {
+        /*
+         * A > e
+         * D > e
+         * B > f
+         * C > f
+         * E > g
+         * F > g
+         * E = OR
+         * F = AND
+         * G = AND
+         * A -> C = lamp
+         * */
+        let mut graph = Graph::new();
+        let mut nodes = Vec::new();
+
+        let input_a = Node::LogicBlock(LogicBlock::new(0b11111, vec![]));
+        nodes.push((input_a, 1));
+        let input_b = Node::LogicBlock(LogicBlock::new(0b11111, vec![]));
+        nodes.push((input_b, 2));
+        let input_c = Node::LogicBlock(LogicBlock::new(0b11111, vec![]));
+        nodes.push((input_c, 3));
+        let input_d = Node::LogicBlock(LogicBlock::new(0b00000, vec![]));
+        nodes.push((input_d, 4));
+
+        let input_e = Node::LogicBlock(LogicBlock::new(0b00110, vec![]));
+        nodes.push((input_e, 5));
+        let input_f = Node::LogicBlock(LogicBlock::new(0b00100, vec![]));
+        nodes.push((input_f, 6));
+        // output
+        let input_g = Node::LogicBlock(LogicBlock::new(0b00100, vec![]));
+        nodes.push((input_g, 7));
+
+        // output (binary or)
+        graph.insert_nodes(nodes);
+        graph.insert_links(vec![(1, 5), (4, 5)]);
+        graph.insert_links(vec![(2, 6), (3, 6)]);
+        graph.insert_links(vec![(5, 7), (6, 7)]);
+        assert!(graph.get_logical_block(1).unwrap().children == [5]);
+        assert!(graph.get_logical_block(2).unwrap().children == [6]);
+        assert!(graph.get_logical_block(3).unwrap().children == [6]);
+        assert!(graph.get_logical_block(4).unwrap().children == [5]);
+        assert!(graph.get_logical_block(5).unwrap().children == [7]);
+        assert!(graph.get_logical_block(6).unwrap().children == [7]);
+        assert!(graph.get_logical_block(7).unwrap().children == []);
+        // add the init actions
+        graph.init_graph_state();
+        assert!(graph.get_logical_block(1).unwrap().get_value() == 0);
+        assert!(graph.get_logical_block(2).unwrap().get_value() == 0);
+        assert!(graph.get_logical_block(3).unwrap().get_value() == 0);
+        assert!(graph.get_logical_block(4).unwrap().get_value() == 0);
+        assert!(graph.get_logical_block(5).unwrap().get_value() == 1);
+        assert!(graph.get_logical_block(6).unwrap().get_value() == 2);
+        assert!(graph.get_logical_block(7).unwrap().get_value() == 2);
+        assert!(graph.get_logical_block(1).unwrap().is_on());
+        assert!(graph.get_logical_block(2).unwrap().is_on());
+        assert!(graph.get_logical_block(3).unwrap().is_on());
+        assert!(!graph.get_logical_block(4).unwrap().is_on());
+        assert!(graph.get_logical_block(5).unwrap().is_on());
+        assert!(graph.get_logical_block(6).unwrap().is_on());
+        assert!(graph.get_logical_block(7).unwrap().is_on());
+    }
+
+    #[test]
+    fn test_storing_block1() {
+        /*
+         * A > c
+         * B > c
+         * C > ^e
+         * D - ^e
+         * A -> B = lamp
+         * C = AND
+         * D = lamp / stone
+         * */
+        let mut graph = Graph::new();
+        let mut nodes = Vec::new();
+
+        let input_a = Node::LogicBlock(LogicBlock::new(0b11111, vec![]));
+        nodes.push((input_a, 1));
+        let input_b = Node::LogicBlock(LogicBlock::new(0b11111, vec![]));
+        nodes.push((input_b, 2));
+        let input_c = Node::LogicBlock(LogicBlock::new(0b00100, vec![]));
+        nodes.push((input_c, 3));
+        let input_d = Node::LogicBlock(LogicBlock::new(0b00000, vec![]));
+        nodes.push((input_d, 4));
+        let input_e = Node::StoringBlock(StoringBlock::new(false, 3, 4, vec![]));
+        nodes.push((input_e, 5));
+
+        graph.insert_nodes(nodes);
+
+        graph.insert_links(vec![(1, 3), (2, 3)]);
+        graph.insert_links(vec![(3, 5), (4, 5)]);
+
+        graph.init_graph_state();
+
+        assert!(graph.get_logical_block(1).unwrap().get_value() == 0);
+        assert!(graph.get_logical_block(2).unwrap().get_value() == 0);
+        assert!(graph.get_logical_block(3).unwrap().get_value() == 2);
+        assert!(graph.get_logical_block(4).unwrap().get_value() == 0);
+
+        assert!(graph.get_logical_block(1).unwrap().is_on() == true);
+        assert!(graph.get_logical_block(2).unwrap().is_on() == true);
+        assert!(graph.get_logical_block(3).unwrap().is_on() == true);
+        assert!(graph.get_logical_block(4).unwrap().is_on() == false);
+        assert!(graph.get_storing_block(5).unwrap().is_on == false);
+    }
+
+    #[test]
+    fn test_storing_block2() {
+        /*
+         * A > c
+         * B > c
+         * C > ^e
+         * D - ^e
+         * A -> B = lamp
+         * C = AND
+         * D = lamp / stone
+         * */
+        let mut graph = Graph::new();
+        let mut nodes = Vec::new();
+
+        let input_a = Node::LogicBlock(LogicBlock::new(0b11111, vec![]));
+        nodes.push((input_a, 1));
+        let input_b = Node::LogicBlock(LogicBlock::new(0b11111, vec![]));
+        nodes.push((input_b, 2));
+        let input_c = Node::LogicBlock(LogicBlock::new(0b00100, vec![]));
+        nodes.push((input_c, 3));
+        let input_d = Node::LogicBlock(LogicBlock::new(0b00000, vec![]));
+        nodes.push((input_d, 4));
+        let input_e = Node::StoringBlock(StoringBlock::new(true, 3, 4, vec![]));
+        nodes.push((input_e, 5));
+
+        graph.insert_nodes(nodes);
+
+        graph.insert_links(vec![(1, 3), (2, 3)]);
+        graph.insert_links(vec![(3, 5), (4, 5)]);
+
+        graph.init_graph_state();
+
+        assert!(graph.get_logical_block(1).unwrap().get_value() == 0);
+        assert!(graph.get_logical_block(2).unwrap().get_value() == 0);
+        assert!(graph.get_logical_block(3).unwrap().get_value() == 2);
+        assert!(graph.get_logical_block(4).unwrap().get_value() == 0);
+
+        assert!(graph.get_logical_block(1).unwrap().is_on() == true);
+        assert!(graph.get_logical_block(2).unwrap().is_on() == true);
+        assert!(graph.get_logical_block(3).unwrap().is_on() == true);
+        assert!(graph.get_logical_block(4).unwrap().is_on() == false);
+        assert!(graph.get_storing_block(5).unwrap().is_on == true);
+    }
+
+    #[test]
+    fn test_storing_block3() {
+        /*
+         * A > c
+         * B > c
+         * C > ^e
+         * D - ^e
+         * A -> B = lamp
+         * C = AND
+         * D = lamp / stone
+         * */
+        let mut graph = Graph::new();
+        let mut nodes = Vec::new();
+
+        let input_a = Node::LogicBlock(LogicBlock::new(0b11111, vec![]));
+        nodes.push((input_a, 1));
+        let input_b = Node::LogicBlock(LogicBlock::new(0b11111, vec![]));
+        nodes.push((input_b, 2));
+        let input_c = Node::LogicBlock(LogicBlock::new(0b00100, vec![]));
+        nodes.push((input_c, 3));
+        let input_d = Node::LogicBlock(LogicBlock::new(0b11111, vec![]));
+        nodes.push((input_d, 4));
+        let input_e = Node::StoringBlock(StoringBlock::new(false, 3, 4, vec![]));
+        nodes.push((input_e, 5));
+
+        graph.insert_nodes(nodes);
+
+        graph.insert_links(vec![(1, 3), (2, 3)]);
+        graph.insert_links(vec![(3, 5), (4, 5)]);
+
+        graph.init_graph_state();
+
+        assert!(graph.get_logical_block(1).unwrap().get_value() == 0);
+        assert!(graph.get_logical_block(2).unwrap().get_value() == 0);
+        assert!(graph.get_logical_block(3).unwrap().get_value() == 2);
+        assert!(graph.get_logical_block(4).unwrap().get_value() == 0);
+
+        assert!(graph.get_logical_block(1).unwrap().is_on() == true);
+        assert!(graph.get_logical_block(2).unwrap().is_on() == true);
+        assert!(graph.get_logical_block(3).unwrap().is_on() == true);
+        assert!(graph.get_logical_block(4).unwrap().is_on() == true);
+        assert!(graph.get_storing_block(5).unwrap().is_on == true);
+    }
+
+    #[test]
+    fn test_storing_block4() {
+        /*
+         * A > c
+         * B > c
+         * C > ^e
+         * D - ^e
+         * A -> B = lamp
+         * C = AND
+         * D = lamp / stone
+         * */
+        let mut graph = Graph::new();
+        let mut nodes = Vec::new();
+
+        let input_a = Node::LogicBlock(LogicBlock::new(0b00000, vec![]));
+        nodes.push((input_a, 1));
+        let input_b = Node::LogicBlock(LogicBlock::new(0b11111, vec![]));
+        nodes.push((input_b, 2));
+        let input_c = Node::LogicBlock(LogicBlock::new(0b00100, vec![]));
+        nodes.push((input_c, 3));
+        let input_d = Node::LogicBlock(LogicBlock::new(0b11111, vec![]));
+        nodes.push((input_d, 4));
+        let input_e = Node::StoringBlock(StoringBlock::new(true, 3, 4, vec![]));
+        nodes.push((input_e, 5));
+
+        graph.insert_nodes(nodes);
+
+        graph.insert_links(vec![(1, 3), (2, 3)]);
+        graph.insert_links(vec![(3, 5), (4, 5)]);
+
+        graph.init_graph_state();
+
+        assert!(graph.get_logical_block(1).unwrap().get_value() == 0);
+        assert!(graph.get_logical_block(2).unwrap().get_value() == 0);
+        assert!(graph.get_logical_block(3).unwrap().get_value() == 1);
+        assert!(graph.get_logical_block(4).unwrap().get_value() == 0);
+
+        assert!(graph.get_logical_block(1).unwrap().is_on() == false);
+        assert!(graph.get_logical_block(2).unwrap().is_on() == true);
+        assert!(graph.get_logical_block(3).unwrap().is_on() == false);
+        assert!(graph.get_logical_block(4).unwrap().is_on() == true);
+        println!("{:#?}", graph.get_storing_block(5));
+        graph.update_storing_node_value(5);
+        assert!(graph.get_storing_block(5).unwrap().is_on == false);
     }
 }

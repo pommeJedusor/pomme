@@ -15,24 +15,12 @@ impl StoringBlock {
             self.children.push(*child);
         }
     }
-    pub fn update(&mut self, graph: Graph) {
-        let button = graph.get_node(self.button_node).expect(&format!(
-            "StoringBlock of source {} don't have any button node",
-            self.source
-        ));
-        let is_button_on = match button {
-            crate::Node::LogicBlock(node) => node.is_on(),
-            crate::Node::StoringBlock(node) => node.is_on,
-        };
-        if is_button_on {
-            let is_source_on = match graph.get_node(self.source).expect(&format!(
-                "StoringBlock of source {} don't have any source",
-                self.source
-            )) {
-                crate::Node::LogicBlock(node) => node.is_on(),
-                crate::Node::StoringBlock(node) => node.is_on,
-            };
-            self.is_on = is_source_on;
+    pub fn new(is_on: bool, source: u32, button_node: u32, children: Vec<u32>) -> StoringBlock {
+        StoringBlock {
+            is_on,
+            source,
+            button_node,
+            children,
         }
     }
 }
