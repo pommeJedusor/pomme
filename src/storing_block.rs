@@ -1,5 +1,3 @@
-use crate::Graph;
-
 #[derive(Debug)]
 pub struct StoringBlock {
     pub is_on: bool,

@@ -7,6 +7,12 @@ use std::collections::VecDeque;
 type NodeId = u32;
 
 #[derive(Debug, Copy, Clone)]
+pub enum ChangeValue {
+    IncreaseValue,
+    DecreaseValue,
+}
+
+#[derive(Debug, Copy, Clone)]
 pub enum NodeAction {
     InitNode,
     IncreaseValue,
@@ -115,33 +121,12 @@ impl Graph {
     /// explored during the initialisation (if the value is 0)
     fn init_node(&mut self, node_id: u32) {
         let node = self.get_mut_node(node_id).expect("node not found");
-        match node {
-            Node::LogicBlock(node) => {
-                if !node.is_on() {
-                    return;
-                }
-                for child in node.children.clone() {
-                    self.actions_queue
-                        .push_back((NodeAction::IncreaseValue, child));
-                }
-            }
-            Node::StoringBlock(node) => {
-                let was_on = node.is_on;
-                let is_on = self.update_storing_node_value(node_id);
-                let node = self.get_storing_block(node_id).expect("node not found");
-                if was_on != is_on {
-                    for child in node.children.clone() {
-                        self.actions_queue.push_back((
-                            if is_on {
-                                NodeAction::IncreaseValue
-                            } else {
-                                NodeAction::DecreaseValue
-                            },
-                            child,
-                        ));
-                    }
-                }
-            }
+        if !node.is_on() {
+            return;
+        }
+        for child in node.get_children().clone() {
+            self.actions_queue
+                .push_back((NodeAction::IncreaseValue, child));
         }
     }
 
@@ -157,23 +142,32 @@ impl Graph {
         node.is_on
     }
 
+    fn update_logic_node_value(&mut self, node_id: u32, change_value: ChangeValue) {
+        let node = self.get_mut_logical_block(node_id).unwrap();
+        let was_on = node.is_on();
+        let new_value = match change_value {
+            ChangeValue::IncreaseValue => node.get_value() + 1,
+            ChangeValue::DecreaseValue => node.get_value() - 1,
+        };
+        node.set_value(new_value);
+        let is_on = node.is_on();
+        if is_on == was_on {
+            return;
+        }
+        let action = match is_on {
+            true => NodeAction::IncreaseValue,
+            false => NodeAction::DecreaseValue,
+        };
+        for child in node.children.clone() {
+            self.actions_queue.push_back((action, child));
+        }
+    }
+
     fn increase_value(&mut self, node_id: u32) {
         let node = self.get_mut_node(node_id).expect("node not found");
         match node {
-            Node::LogicBlock(node) => {
-                let was_on = node.is_on();
-                node.set_value(node.get_value() + 1);
-                let is_on = node.is_on();
-                if is_on == was_on {
-                    return;
-                }
-                let action = match is_on {
-                    true => NodeAction::IncreaseValue,
-                    false => NodeAction::DecreaseValue,
-                };
-                for child in node.children.clone() {
-                    self.actions_queue.push_back((action, child));
-                }
+            Node::LogicBlock(_) => {
+                self.update_logic_node_value(node_id, ChangeValue::IncreaseValue);
             }
             Node::StoringBlock(_) => {
                 self.update_storing_node_value(node_id);
@@ -184,20 +178,8 @@ impl Graph {
     fn decrease_value(&mut self, node_id: u32) {
         let node = self.get_mut_node(node_id).expect("node not found");
         match node {
-            Node::LogicBlock(node) => {
-                let was_on = node.is_on();
-                node.set_value(node.get_value() - 1);
-                let is_on = node.is_on();
-                if is_on == was_on {
-                    return;
-                }
-                let action = match is_on {
-                    true => NodeAction::IncreaseValue,
-                    false => NodeAction::DecreaseValue,
-                };
-                for child in node.children.clone() {
-                    self.actions_queue.push_back((action, child));
-                }
+            Node::LogicBlock(_) => {
+                self.update_logic_node_value(node_id, ChangeValue::DecreaseValue);
             }
             Node::StoringBlock(_) => {
                 self.update_storing_node_value(node_id);
@@ -542,8 +524,32 @@ mod tests {
         assert!(graph.get_logical_block(2).unwrap().is_on() == true);
         assert!(graph.get_logical_block(3).unwrap().is_on() == false);
         assert!(graph.get_logical_block(4).unwrap().is_on() == true);
-        println!("{:#?}", graph.get_storing_block(5));
-        graph.update_storing_node_value(5);
         assert!(graph.get_storing_block(5).unwrap().is_on == false);
     }
+    //#[test]
+    //fn boucle() {
+    //    /*
+    //     * A > b
+    //     * B > c
+    //     * C > a
+    //     * A strictly needs 0
+    //     * B strictly needs 1
+    //     * C strictly needs 1
+    //     * */
+    //    let mut graph = Graph::new();
+    //    let mut nodes = Vec::new();
+    //
+    //    let input_a = Node::LogicBlock(LogicBlock::new(0b00001, vec![]));
+    //    nodes.push((input_a, 1));
+    //    let input_b = Node::LogicBlock(LogicBlock::new(0b00010, vec![]));
+    //    nodes.push((input_b, 2));
+    //    let input_c = Node::LogicBlock(LogicBlock::new(0b00010, vec![]));
+    //    nodes.push((input_c, 3));
+    //
+    //    graph.insert_nodes(nodes);
+    //
+    //    graph.insert_links(vec![(1, 2), (2, 3), (3, 1)]);
+    //
+    //    graph.init_graph_state();
+    //}
 }
