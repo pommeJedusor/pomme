@@ -553,6 +553,145 @@ mod tests {
         graph.do_actions();
         assert!(!graph.get_storing_block(5).unwrap().is_on);
     }
+
+    #[test]
+    fn test_adder() {
+        /*
+         * */
+        let mut graph = Graph::new();
+        let mut nodes = Vec::new();
+
+        // input 1
+        nodes.push((Node::LogicBlock(LogicBlock::new(0b00000, vec![])), 1));
+        nodes.push((Node::LogicBlock(LogicBlock::new(0b00000, vec![])), 2));
+        nodes.push((Node::LogicBlock(LogicBlock::new(0b00000, vec![])), 3));
+        nodes.push((Node::LogicBlock(LogicBlock::new(0b00000, vec![])), 4));
+        nodes.push((Node::LogicBlock(LogicBlock::new(0b00000, vec![])), 5));
+        nodes.push((Node::LogicBlock(LogicBlock::new(0b00000, vec![])), 6));
+        nodes.push((Node::LogicBlock(LogicBlock::new(0b00000, vec![])), 7));
+        nodes.push((Node::LogicBlock(LogicBlock::new(0b00000, vec![])), 8));
+
+        // input 2
+        nodes.push((Node::LogicBlock(LogicBlock::new(0b00000, vec![])), 9));
+        nodes.push((Node::LogicBlock(LogicBlock::new(0b00000, vec![])), 10));
+        nodes.push((Node::LogicBlock(LogicBlock::new(0b00000, vec![])), 11));
+        nodes.push((Node::LogicBlock(LogicBlock::new(0b00000, vec![])), 12));
+        nodes.push((Node::LogicBlock(LogicBlock::new(0b00000, vec![])), 13));
+        nodes.push((Node::LogicBlock(LogicBlock::new(0b00000, vec![])), 14));
+        nodes.push((Node::LogicBlock(LogicBlock::new(0b00000, vec![])), 15));
+        nodes.push((Node::LogicBlock(LogicBlock::new(0b00000, vec![])), 16));
+
+        // ouput
+        nodes.push((Node::LogicBlock(LogicBlock::new(0b01010, vec![])), 17));
+        nodes.push((Node::LogicBlock(LogicBlock::new(0b01010, vec![])), 18));
+        nodes.push((Node::LogicBlock(LogicBlock::new(0b01010, vec![])), 19));
+        nodes.push((Node::LogicBlock(LogicBlock::new(0b01010, vec![])), 20));
+        nodes.push((Node::LogicBlock(LogicBlock::new(0b01010, vec![])), 21));
+        nodes.push((Node::LogicBlock(LogicBlock::new(0b01010, vec![])), 22));
+        nodes.push((Node::LogicBlock(LogicBlock::new(0b01010, vec![])), 23));
+        nodes.push((Node::LogicBlock(LogicBlock::new(0b01010, vec![])), 24));
+
+        // rest
+        nodes.push((Node::LogicBlock(LogicBlock::new(0b01100, vec![])), 25));
+        nodes.push((Node::LogicBlock(LogicBlock::new(0b01100, vec![])), 26));
+        nodes.push((Node::LogicBlock(LogicBlock::new(0b01100, vec![])), 27));
+        nodes.push((Node::LogicBlock(LogicBlock::new(0b01100, vec![])), 28));
+        nodes.push((Node::LogicBlock(LogicBlock::new(0b01100, vec![])), 29));
+        nodes.push((Node::LogicBlock(LogicBlock::new(0b01100, vec![])), 30));
+        nodes.push((Node::LogicBlock(LogicBlock::new(0b01100, vec![])), 31));
+
+        graph.insert_nodes(nodes);
+
+        /* from rightest bit to leftest */
+        // bit 1
+        graph.insert_links(vec![(1, 17), (9, 17), (1, 25), (9, 25)]);
+
+        // bit 2
+        graph.insert_links(vec![
+            (2, 18),
+            (10, 18),
+            (2, 26),
+            (10, 26),
+            (25, 18),
+            (25, 26),
+        ]);
+
+        // bit 3
+        graph.insert_links(vec![
+            (3, 19),
+            (11, 19),
+            (3, 27),
+            (11, 27),
+            (26, 19),
+            (26, 27),
+        ]);
+
+        // bit 4
+        graph.insert_links(vec![
+            (4, 20),
+            (12, 20),
+            (4, 28),
+            (12, 28),
+            (27, 20),
+            (27, 28),
+        ]);
+
+        // bit 5
+        graph.insert_links(vec![
+            (5, 21),
+            (13, 21),
+            (5, 29),
+            (13, 29),
+            (28, 21),
+            (28, 29),
+        ]);
+
+        // bit 6
+        graph.insert_links(vec![
+            (6, 22),
+            (14, 22),
+            (6, 30),
+            (14, 30),
+            (29, 22),
+            (29, 30),
+        ]);
+
+        // bit 7
+        graph.insert_links(vec![
+            (7, 23),
+            (15, 23),
+            (7, 31),
+            (15, 31),
+            (30, 23),
+            (30, 31),
+        ]);
+
+        // bit 8
+        graph.insert_links(vec![(8, 23), (16, 23), (31, 23)]);
+
+        graph.init_graph_state();
+
+        // set input 1 to 6
+        graph.turn_on_lamp(2);
+        graph.turn_on_lamp(3);
+
+        // set input 2 to 33
+        graph.turn_on_lamp(1);
+        graph.turn_on_lamp(6);
+
+        graph.apply_changes();
+
+        // assert that the result is 39 (0b00100111)
+        assert!(graph.get_node(17).unwrap().is_on());
+        assert!(graph.get_node(18).unwrap().is_on());
+        assert!(graph.get_node(19).unwrap().is_on());
+        assert!(!graph.get_node(20).unwrap().is_on());
+        assert!(!graph.get_node(21).unwrap().is_on());
+        assert!(graph.get_node(22).unwrap().is_on());
+        assert!(!graph.get_node(23).unwrap().is_on());
+        assert!(!graph.get_node(24).unwrap().is_on());
+    }
+
     //#[test]
     //fn boucle() {
     //    /*
