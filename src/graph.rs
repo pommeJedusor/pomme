@@ -90,7 +90,7 @@ impl Graph {
     pub fn get_node(&self, key: u32) -> Option<&Node> {
         self.nodes.get(&key)
     }
-    pub fn get_mut_node(&mut self, key: u32) -> Option<&mut Node> {
+    fn get_mut_node(&mut self, key: u32) -> Option<&mut Node> {
         self.nodes.get_mut(&key)
     }
     pub fn get_logical_block(&self, key: u32) -> Option<&LogicBlock> {
@@ -105,13 +105,13 @@ impl Graph {
             Node::StoringBlock(node) => Some(node),
         }
     }
-    pub fn get_mut_logical_block(&mut self, key: u32) -> Option<&mut LogicBlock> {
+    fn get_mut_logical_block(&mut self, key: u32) -> Option<&mut LogicBlock> {
         match self.nodes.get_mut(&key)? {
             Node::LogicBlock(node) => Some(node),
             Node::StoringBlock(_) => None,
         }
     }
-    pub fn get_mut_storing_block(&mut self, key: u32) -> Option<&mut StoringBlock> {
+    fn get_mut_storing_block(&mut self, key: u32) -> Option<&mut StoringBlock> {
         match self.nodes.get_mut(&key)? {
             Node::LogicBlock(_) => None,
             Node::StoringBlock(node) => Some(node),
@@ -204,6 +204,48 @@ impl Graph {
                 .push_back((NodeAction::InitNode, *node_id));
         }
         self.do_actions();
+    }
+
+    pub fn turn_on_lamp(&mut self, node_id: u32) {
+        let node = self
+            .get_mut_logical_block(node_id)
+            .expect("can't turn on storing block");
+        assert!(
+            node.get_requirements() != 0b11111,
+            "lamp already turned on ({})",
+            node_id
+        );
+        assert!(
+            node.get_requirements() == 0b00000,
+            "it is not allowed to turn on a none rock block ({})",
+            node_id
+        );
+        node.set_requirements(0b11111);
+        for child in node.children.clone() {
+            self.actions_queue
+                .push_back((NodeAction::IncreaseValue, child));
+        }
+    }
+
+    pub fn turn_off_lamp(&mut self, node_id: u32) {
+        let node = self
+            .get_mut_logical_block(node_id)
+            .expect("can't turn on storing block");
+        assert!(
+            node.get_requirements() != 0b00000,
+            "lamp already turned off ({})",
+            node_id
+        );
+        assert!(
+            node.get_requirements() == 0b11111,
+            "it is not allowed to turn off a none lamp block ({})",
+            node_id
+        );
+        node.set_requirements(0b00000);
+        for child in node.children.clone() {
+            self.actions_queue
+                .push_back((NodeAction::DecreaseValue, child));
+        }
     }
 }
 
@@ -510,11 +552,22 @@ mod tests {
         assert!(graph.get_logical_block(3).unwrap().get_value() == 1);
         assert!(graph.get_logical_block(4).unwrap().get_value() == 0);
 
-        assert!(graph.get_logical_block(1).unwrap().is_on() == false);
-        assert!(graph.get_logical_block(2).unwrap().is_on() == true);
-        assert!(graph.get_logical_block(3).unwrap().is_on() == false);
-        assert!(graph.get_logical_block(4).unwrap().is_on() == true);
-        assert!(graph.get_storing_block(5).unwrap().is_on == false);
+        assert!(!graph.get_logical_block(1).unwrap().is_on());
+        assert!(graph.get_logical_block(2).unwrap().is_on());
+        assert!(!graph.get_logical_block(3).unwrap().is_on());
+        assert!(graph.get_logical_block(4).unwrap().is_on());
+        assert!(!graph.get_storing_block(5).unwrap().is_on);
+
+        graph.turn_on_lamp(1);
+        graph.do_actions();
+        assert!(graph.get_storing_block(5).unwrap().is_on);
+        graph.turn_off_lamp(1);
+        graph.turn_off_lamp(4);
+        graph.do_actions();
+        assert!(graph.get_storing_block(5).unwrap().is_on);
+        graph.turn_on_lamp(4);
+        graph.do_actions();
+        assert!(!graph.get_storing_block(5).unwrap().is_on);
     }
     //#[test]
     //fn boucle() {
