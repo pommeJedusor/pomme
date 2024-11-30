@@ -32,6 +32,7 @@ impl Graph {
             actions_queue: VecDeque::new(),
         }
     }
+
     pub fn insert_nodes(&mut self, nodes: Vec<(Node, NodeId)>) {
         for (node, id) in nodes {
             assert!(!self.nodes.contains_key(&id));
@@ -66,6 +67,7 @@ impl Graph {
         for link in links {
             assert!(self.nodes.contains_key(&link.0));
             assert!(self.nodes.contains_key(&link.1));
+
             let is_first_storing_block =
                 matches!(self.nodes.get(&link.0).unwrap(), Node::StoringBlock(_));
             let is_second_storing_block =
@@ -134,8 +136,8 @@ impl Graph {
         let node = self.get_storing_block(node_id).unwrap();
         let is_source_on = self.get_logical_block(node.source).unwrap().is_on();
         let is_button_node_on = self.get_logical_block(node.button_node).unwrap().is_on();
+
         let node = self.get_mut_storing_block(node_id).unwrap();
-        println!("source: {is_source_on}\nbutton: {is_button_node_on}\n");
         if is_button_node_on {
             node.is_on = is_source_on;
         }
@@ -163,23 +165,11 @@ impl Graph {
         }
     }
 
-    fn increase_value(&mut self, node_id: u32) {
+    fn update_value(&mut self, node_id: u32, change_value: ChangeValue) {
         let node = self.get_mut_node(node_id).expect("node not found");
         match node {
             Node::LogicBlock(_) => {
-                self.update_logic_node_value(node_id, ChangeValue::IncreaseValue);
-            }
-            Node::StoringBlock(_) => {
-                self.update_storing_node_value(node_id);
-            }
-        }
-    }
-
-    fn decrease_value(&mut self, node_id: u32) {
-        let node = self.get_mut_node(node_id).expect("node not found");
-        match node {
-            Node::LogicBlock(_) => {
-                self.update_logic_node_value(node_id, ChangeValue::DecreaseValue);
+                self.update_logic_node_value(node_id, change_value);
             }
             Node::StoringBlock(_) => {
                 self.update_storing_node_value(node_id);
@@ -195,8 +185,8 @@ impl Graph {
         let (action, node) = action.unwrap();
         match action {
             NodeAction::InitNode => self.init_node(node),
-            NodeAction::IncreaseValue => self.increase_value(node),
-            NodeAction::DecreaseValue => self.decrease_value(node),
+            NodeAction::IncreaseValue => self.update_value(node, ChangeValue::IncreaseValue),
+            NodeAction::DecreaseValue => self.update_value(node, ChangeValue::DecreaseValue),
         }
     }
 
