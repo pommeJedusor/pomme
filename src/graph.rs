@@ -33,6 +33,44 @@ impl Graph {
         }
     }
 
+    /* getters */
+    pub fn get_node(&self, key: u32) -> Option<&Node> {
+        self.nodes.get(&key)
+    }
+
+    fn get_mut_node(&mut self, key: u32) -> Option<&mut Node> {
+        self.nodes.get_mut(&key)
+    }
+
+    pub fn get_logical_block(&self, key: u32) -> Option<&LogicBlock> {
+        match self.nodes.get(&key)? {
+            Node::LogicBlock(node) => Some(node),
+            Node::StoringBlock(_) => None,
+        }
+    }
+
+    fn get_mut_logical_block(&mut self, key: u32) -> Option<&mut LogicBlock> {
+        match self.nodes.get_mut(&key)? {
+            Node::LogicBlock(node) => Some(node),
+            Node::StoringBlock(_) => None,
+        }
+    }
+
+    pub fn get_storing_block(&self, key: u32) -> Option<&StoringBlock> {
+        match self.nodes.get(&key)? {
+            Node::LogicBlock(_) => None,
+            Node::StoringBlock(node) => Some(node),
+        }
+    }
+
+    fn get_mut_storing_block(&mut self, key: u32) -> Option<&mut StoringBlock> {
+        match self.nodes.get_mut(&key)? {
+            Node::LogicBlock(_) => None,
+            Node::StoringBlock(node) => Some(node),
+        }
+    }
+
+    /* pub methods */
     pub fn insert_nodes(&mut self, nodes: Vec<(Node, NodeId)>) {
         for (node, id) in nodes {
             assert!(!self.nodes.contains_key(&id));
@@ -40,8 +78,6 @@ impl Graph {
         }
     }
 
-    /// do not work with button links for storing block
-    /// if the second one is a storing block takes the first one as the source
     pub fn insert_links(&mut self, links: Vec<(NodeId, NodeId)>) {
         for link in links {
             assert!(self.nodes.contains_key(&link.0));
@@ -62,65 +98,65 @@ impl Graph {
             }
         }
     }
-    /// links must be compose of one logical block and one storing block
-    pub fn insert_button_links(&mut self, links: Vec<(NodeId, NodeId)>) {
-        for link in links {
-            assert!(self.nodes.contains_key(&link.0));
-            assert!(self.nodes.contains_key(&link.1));
 
-            let is_first_storing_block =
-                matches!(self.nodes.get(&link.0).unwrap(), Node::StoringBlock(_));
-            let is_second_storing_block =
-                matches!(self.nodes.get(&link.1).unwrap(), Node::StoringBlock(_));
-            assert_ne!(is_first_storing_block, is_second_storing_block);
+    /// init the value of the nodes in the graph
+    /// to do only once and if and only if all the nodes have adden
+    pub fn init_graph_state(&mut self) {
+        for node_id in self.nodes.keys() {
+            self.actions_queue
+                .push_back((NodeAction::InitNode, *node_id));
+        }
+        self.do_actions();
+    }
 
-            let (storing_block_link, logical_block_link) = if is_first_storing_block {
-                (link.0, link.1)
-            } else {
-                (link.1, link.0)
-            };
-
-            let storing_block = self.get_mut_storing_block(storing_block_link).unwrap();
-            storing_block.button_node = logical_block_link;
-            let logical_block = self.get_mut_logical_block(logical_block_link).unwrap();
-            logical_block.children.push(storing_block_link);
+    pub fn turn_on_lamp(&mut self, node_id: u32) {
+        let node = self
+            .get_mut_logical_block(node_id)
+            .expect("can't turn on storing block");
+        assert!(
+            node.get_requirements() != 0b11111,
+            "lamp already turned on ({})",
+            node_id
+        );
+        assert!(
+            node.get_requirements() == 0b00000,
+            "it is not allowed to turn on a none rock block ({})",
+            node_id
+        );
+        node.set_requirements(0b11111);
+        for child in node.children.clone() {
+            self.actions_queue
+                .push_back((NodeAction::IncreaseValue, child));
         }
     }
 
-    pub fn get_node(&self, key: u32) -> Option<&Node> {
-        self.nodes.get(&key)
-    }
-    fn get_mut_node(&mut self, key: u32) -> Option<&mut Node> {
-        self.nodes.get_mut(&key)
-    }
-    pub fn get_logical_block(&self, key: u32) -> Option<&LogicBlock> {
-        match self.nodes.get(&key)? {
-            Node::LogicBlock(node) => Some(node),
-            Node::StoringBlock(_) => None,
-        }
-    }
-    pub fn get_storing_block(&self, key: u32) -> Option<&StoringBlock> {
-        match self.nodes.get(&key)? {
-            Node::LogicBlock(_) => None,
-            Node::StoringBlock(node) => Some(node),
-        }
-    }
-    fn get_mut_logical_block(&mut self, key: u32) -> Option<&mut LogicBlock> {
-        match self.nodes.get_mut(&key)? {
-            Node::LogicBlock(node) => Some(node),
-            Node::StoringBlock(_) => None,
-        }
-    }
-    fn get_mut_storing_block(&mut self, key: u32) -> Option<&mut StoringBlock> {
-        match self.nodes.get_mut(&key)? {
-            Node::LogicBlock(_) => None,
-            Node::StoringBlock(node) => Some(node),
+    pub fn turn_off_lamp(&mut self, node_id: u32) {
+        let node = self
+            .get_mut_logical_block(node_id)
+            .expect("can't turn on storing block");
+        assert!(
+            node.get_requirements() != 0b00000,
+            "lamp already turned off ({})",
+            node_id
+        );
+        assert!(
+            node.get_requirements() == 0b11111,
+            "it is not allowed to turn off a none lamp block ({})",
+            node_id
+        );
+        node.set_requirements(0b00000);
+        for child in node.children.clone() {
+            self.actions_queue
+                .push_back((NodeAction::DecreaseValue, child));
         }
     }
 
-    /// only when initialising the graph
-    /// add add increasevalue action to all children if the node is on and if it hasn't been
-    /// explored during the initialisation (if the value is 0)
+    pub fn apply_changes(&mut self) {
+        self.do_actions();
+    }
+
+    /* privte methods*/
+    /// must only be used when initialising the graph
     fn init_node(&mut self, node_id: u32) {
         let node = self.get_mut_node(node_id).expect("node not found");
         if !node.is_on() {
@@ -177,7 +213,7 @@ impl Graph {
         }
     }
 
-    pub fn do_action(&mut self) {
+    fn do_action(&mut self) {
         let action = self.actions_queue.pop_front();
         if action.is_none() {
             return;
@@ -190,61 +226,9 @@ impl Graph {
         }
     }
 
-    pub fn do_actions(&mut self) {
+    fn do_actions(&mut self) {
         while !self.actions_queue.is_empty() {
             self.do_action();
-        }
-    }
-
-    /// init the value of the nodes in the graph
-    /// to do only once and if and only if all the nodes have adden
-    pub fn init_graph_state(&mut self) {
-        for node_id in self.nodes.keys() {
-            self.actions_queue
-                .push_back((NodeAction::InitNode, *node_id));
-        }
-        self.do_actions();
-    }
-
-    pub fn turn_on_lamp(&mut self, node_id: u32) {
-        let node = self
-            .get_mut_logical_block(node_id)
-            .expect("can't turn on storing block");
-        assert!(
-            node.get_requirements() != 0b11111,
-            "lamp already turned on ({})",
-            node_id
-        );
-        assert!(
-            node.get_requirements() == 0b00000,
-            "it is not allowed to turn on a none rock block ({})",
-            node_id
-        );
-        node.set_requirements(0b11111);
-        for child in node.children.clone() {
-            self.actions_queue
-                .push_back((NodeAction::IncreaseValue, child));
-        }
-    }
-
-    pub fn turn_off_lamp(&mut self, node_id: u32) {
-        let node = self
-            .get_mut_logical_block(node_id)
-            .expect("can't turn on storing block");
-        assert!(
-            node.get_requirements() != 0b00000,
-            "lamp already turned off ({})",
-            node_id
-        );
-        assert!(
-            node.get_requirements() == 0b11111,
-            "it is not allowed to turn off a none lamp block ({})",
-            node_id
-        );
-        node.set_requirements(0b00000);
-        for child in node.children.clone() {
-            self.actions_queue
-                .push_back((NodeAction::DecreaseValue, child));
         }
     }
 }
