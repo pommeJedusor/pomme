@@ -6,7 +6,7 @@ AA -> AH
 BA -> BH
 
 
-ouputs:
+outputs:
 # 8 bits ouput
 CA -> CH 1, 3
 
