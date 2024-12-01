@@ -174,10 +174,24 @@ impl Graph {
         let is_button_node_on = self.get_logical_block(node.button_node).unwrap().is_on();
 
         let node = self.get_mut_storing_block(node_id).unwrap();
+        let was_on = node.is_on;
         if is_button_node_on {
             node.is_on = is_source_on;
         }
-        node.is_on
+        let is_on = node.is_on;
+
+        if was_on == is_on {
+            return is_on;
+        }
+
+        let action = match is_on {
+            true => NodeAction::IncreaseValue,
+            false => NodeAction::DecreaseValue,
+        };
+        for child in node.children.clone() {
+            self.actions_queue.push_back((action, child));
+        }
+        is_on
     }
 
     fn update_logic_node_value(&mut self, node_id: u32, change_value: ChangeValue) {
