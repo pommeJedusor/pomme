@@ -1,0 +1,31 @@
+# example adder component (adder.bw)
+inputs:
+# first 8 bits input
+AA -> AH
+# second 8 bits input
+BA -> BH
+
+
+ouputs:
+# 8 bits ouput
+CA -> CH 1, 3
+
+
+def:
+# rest
+DA -> DH 2, 3
+
+
+links:
+for $i in A -> H:
+    # no rest for 8th bit because we don't compute the 9th
+    if $i != H:
+        A$i -> C$i, D$i
+        B$i -> C$i, D$i
+    else:
+        A$i -> C$i
+        B$i -> C$i
+
+    # compute the rest
+    if $i != H:
+        D$i -> C$($i + A), D$($i + A)

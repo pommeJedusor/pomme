@@ -1,9 +1,11 @@
+mod compiler;
 mod graph;
 mod interpreter;
 mod logic_block;
 mod node;
 mod storing_block;
 
+pub use compiler::compile;
 pub use graph::Graph;
 pub use interpreter::init_map;
 pub use logic_block::LogicBlock;
