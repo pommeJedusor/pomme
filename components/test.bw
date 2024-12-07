@@ -1,0 +1,35 @@
+# example adder component (adder.bw)
+inputs:
+# first 8 bits input
+AA -> AH
+# second 8 bits input
+BA -> BH
+
+
+outputs:
+# 8 bits ouput
+CA -> CH 1, 3
+
+
+def:
+# rest
+DA -> DH 2, 3
+
+
+links:
+AA, BA -> CA, DA
+AB, BB -> CB, DB
+AC, BC -> CC, DC
+AD, BD -> CD, DD
+AE, BE -> CE, DE
+AF, BF -> CF, DF
+AG, BG -> CG, DG
+AH, BH -> CH
+
+DA -> CB, DB
+DB -> CC, DC
+DC -> CD, DD
+DD -> CE, DE
+DE -> CF, DF
+DF -> CG, DG
+DG -> CH, DH
