@@ -46,25 +46,91 @@ fn increment_node_name(input: &str) -> String {
     chars.iter().collect()
 }
 
-pub fn is_line_link_declaration(line: &str) -> bool {
+fn is_line_link_declaration(line: &str) -> bool {
     true
 }
 
-pub fn get_link_line_type(line: &str) -> LinkLineType {
+fn get_link_line_type(line: &str) -> LinkLineType {
+    if line.starts_with("for") {
+        return LinkLineType::Boucle;
+    }
     LinkLineType::LinkDeclaration
 }
 
-pub fn analyse_links_part(lines: &Vec<&str>) -> Vec<(String, String)> {
+pub fn apply_variable(node: &str, variables: &mut HashMap<String, String>) -> String {
+    let mut result = String::new();
+    let mut stack = String::new();
+    for letter in node.chars() {
+        assert!(!(letter == '$' && stack.len() > 0));
+        if stack.len() != 0 || letter == '$' {
+            stack.push(letter);
+            if variables.contains_key(&stack) {
+                result.push_str(variables.get(&stack).unwrap());
+                stack = String::new();
+            }
+        } else {
+            result.push(letter);
+        }
+    }
+    assert!(stack.len() == 0, "node: {}, stack: {}", node, stack);
+    result
+}
+
+pub fn analyse_links_part(
+    lines: &Vec<&str>,
+    variables: &mut HashMap<String, String>,
+    nb_block_leading_spaces: u8,
+) -> Vec<(String, String)> {
     let mut links: Vec<(String, String)> = Vec::new();
-    for line in lines {
+    for (i, line) in lines.iter().enumerate() {
+        let nb_line_leading_spaces = line.chars().position(|x| x != ' ').unwrap() as u8;
+        let line = line.trim();
+        match nb_line_leading_spaces.cmp(&nb_block_leading_spaces) {
+            std::cmp::Ordering::Less => return links,
+            std::cmp::Ordering::Equal => {}
+            std::cmp::Ordering::Greater => continue,
+        };
+
         match get_link_line_type(line) {
             LinkLineType::LinkDeclaration => {
                 let result = line.split("->").collect::<Vec<&str>>();
-                let sources = result[0].trim().split(",").map(|x| x.trim()).into_iter();
-                let targets = result[1].trim().split(",").map(|x| x.trim()).into_iter();
+                let sources = result[0]
+                    .trim()
+                    .split(",")
+                    .map(|x| apply_variable(x.trim(), variables))
+                    .collect::<Vec<String>>();
+                let targets = result[1]
+                    .trim()
+                    .split(",")
+                    .map(|x| apply_variable(x.trim(), variables))
+                    .collect::<Vec<String>>();
                 for source in sources.clone() {
                     for target in targets.clone() {
                         links.push((source.to_string(), target.to_string()));
+                    }
+                }
+            }
+
+            LinkLineType::Boucle => {
+                let mut line = line.split(" ").filter(|x| x != &" ");
+                let variable_name = line.nth(1).unwrap();
+                let range = (line.nth(1).unwrap(), line.nth(1).unwrap());
+                let nodes = get_nodes_of_range(range.0, range.1);
+                assert!(variable_name.starts_with("$"));
+                for node in nodes {
+                    variables.insert(variable_name.to_string(), node);
+                    let lines = lines.iter().map(|&x| x).skip(i + 1).collect::<Vec<&str>>();
+                    let boucle_indent = lines
+                        .iter()
+                        .skip(i)
+                        .next()
+                        .unwrap()
+                        .chars()
+                        .position(|x| x != ' ')
+                        .unwrap();
+                    let boucle_links = analyse_links_part(&lines, variables, boucle_indent as u8);
+                    for link in boucle_links {
+                        links.push(link);
                     }
                 }
             }
@@ -75,7 +141,6 @@ pub fn analyse_links_part(lines: &Vec<&str>) -> Vec<(String, String)> {
 }
 
 pub fn compile(path: &str) {
-    const INDENTATION_LENGTH: u32 = 4;
     let allowed_sections = ["inputs", "outputs", "def", "links", "imports"];
 
     // divide the content in sections and the sections in lines also remove the comments and empty lines
@@ -191,7 +256,7 @@ pub fn compile(path: &str) {
     }
     // TODO: links
     let links_section = sections.get("links").expect("links field is missing");
-    let links = analyse_links_part(links_section);
+    let links = analyse_links_part(links_section, &mut HashMap::new(), 0);
     for link in links {
         nodes_hashmap.entry(link.0).and_modify(|x| x.push(link.1));
     }
@@ -233,6 +298,29 @@ mod tests {
     fn test() {
         compile("./components/test.bw");
         let mut map = init_map("./components/test.bwc");
+        // init input 1 to 96 (0b01100000)
+        map.turn_on_lamp(6);
+        map.turn_on_lamp(7);
+        // init input 2 to 37 (0b00100101)
+        map.turn_on_lamp(9);
+        map.turn_on_lamp(11);
+        map.turn_on_lamp(14);
+        // check output is 133 (0b10000101)
+        map.apply_changes();
+        assert!(map.get_node(17).unwrap().is_on());
+        assert!(!map.get_node(18).unwrap().is_on());
+        assert!(map.get_node(19).unwrap().is_on());
+        assert!(!map.get_node(20).unwrap().is_on());
+        assert!(!map.get_node(21).unwrap().is_on());
+        assert!(!map.get_node(22).unwrap().is_on());
+        assert!(!map.get_node(23).unwrap().is_on());
+        assert!(map.get_node(24).unwrap().is_on());
+    }
+
+    #[test]
+    fn test2() {
+        compile("./components/test2.bw");
+        let mut map = init_map("./components/test2.bwc");
         // init input 1 to 96 (0b01100000)
         map.turn_on_lamp(6);
         map.turn_on_lamp(7);
