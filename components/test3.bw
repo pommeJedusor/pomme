@@ -1,0 +1,23 @@
+# example adder component (adder.bw)
+inputs:
+# first 8 bits input
+AA -> AH
+# second 8 bits input
+BA -> BH
+
+
+outputs:
+# 8 bits ouput
+CA -> CH 1, 3
+
+
+def:
+# rest
+DA -> DH 2, 3
+
+
+links:
+for $i in A -> G
+    A$i, B$i -> C$i, D$i
+    D$i -> C$($i + A), D$($i + A)
+AH, BH -> CH

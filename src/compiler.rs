@@ -46,10 +46,6 @@ fn increment_node_name(input: &str) -> String {
     chars.iter().collect()
 }
 
-fn is_line_link_declaration(line: &str) -> bool {
-    true
-}
-
 fn get_link_line_type(line: &str) -> LinkLineType {
     if line.starts_with("for") {
         return LinkLineType::Boucle;
@@ -57,14 +53,68 @@ fn get_link_line_type(line: &str) -> LinkLineType {
     LinkLineType::LinkDeclaration
 }
 
+fn from_node_name_to_decimal(value: &str) -> usize {
+    let mut sum = 0;
+    for (i, letter) in value.chars().enumerate() {
+        let ascii_value = letter as usize;
+        let is_lower_case_letter = ascii_value >= 65 && ascii_value <= 90;
+        assert!(is_lower_case_letter);
+        let value = (ascii_value - 64) * (26usize.pow(i as u32));
+        sum += value;
+    }
+    sum
+}
+
+fn from_decimal_to_node_name(mut value: usize) -> String {
+    let mut result = String::new();
+    while value != 0 {
+        let letter = (value % 26 + 64) as u8 as char;
+        result.push(letter);
+        value /= 26;
+    }
+    result.chars().rev().collect()
+}
+
+fn get_sum_values(values: Vec<String>) -> String {
+    let sum = values
+        .iter()
+        .map(|x| from_node_name_to_decimal(x))
+        .sum::<usize>();
+    from_decimal_to_node_name(sum)
+}
+
 pub fn apply_variable(node: &str, variables: &mut HashMap<String, String>) -> String {
     let mut result = String::new();
     let mut stack = String::new();
     for letter in node.chars() {
-        assert!(!(letter == '$' && stack.len() > 0));
+        //assert!(!(letter == '$' && stack.len() > 0));
+        if letter == ')' {
+            println!("{:#?}", stack);
+            assert!(stack.chars().nth(1).unwrap() == '(');
+            let parameters = stack
+                .chars()
+                .skip(2)
+                .collect::<String>()
+                .split("+")
+                .map(|x| x.trim())
+                .filter(|&x| x != "")
+                .map(|x| {
+                    println!("test: {:#?}, {:#?}", x, x.starts_with('$'));
+                    if x.starts_with('$') {
+                        apply_variable(x, variables)
+                    } else {
+                        x.to_string()
+                    }
+                })
+                .collect::<Vec<String>>();
+            let sum = get_sum_values(parameters);
+            result.push_str(&sum);
+            stack = String::new();
+            continue;
+        }
         if stack.len() != 0 || letter == '$' {
             stack.push(letter);
-            if variables.contains_key(&stack) {
+            if variables.contains_key(&stack) && stack.chars().nth(1) != Some('(') {
                 result.push_str(variables.get(&stack).unwrap());
                 stack = String::new();
             }
@@ -321,6 +371,29 @@ mod tests {
     fn test2() {
         compile("./components/test2.bw");
         let mut map = init_map("./components/test2.bwc");
+        // init input 1 to 96 (0b01100000)
+        map.turn_on_lamp(6);
+        map.turn_on_lamp(7);
+        // init input 2 to 37 (0b00100101)
+        map.turn_on_lamp(9);
+        map.turn_on_lamp(11);
+        map.turn_on_lamp(14);
+        // check output is 133 (0b10000101)
+        map.apply_changes();
+        assert!(map.get_node(17).unwrap().is_on());
+        assert!(!map.get_node(18).unwrap().is_on());
+        assert!(map.get_node(19).unwrap().is_on());
+        assert!(!map.get_node(20).unwrap().is_on());
+        assert!(!map.get_node(21).unwrap().is_on());
+        assert!(!map.get_node(22).unwrap().is_on());
+        assert!(!map.get_node(23).unwrap().is_on());
+        assert!(map.get_node(24).unwrap().is_on());
+    }
+
+    #[test]
+    fn test3() {
+        compile("./components/test3.bw");
+        let mut map = init_map("./components/test3.bwc");
         // init input 1 to 96 (0b01100000)
         map.turn_on_lamp(6);
         map.turn_on_lamp(7);
