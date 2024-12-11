@@ -50,6 +50,9 @@ fn get_link_line_type(line: &str) -> LinkLineType {
     if line.starts_with("for") {
         return LinkLineType::Boucle;
     }
+    if line.starts_with("if") {
+        return LinkLineType::Condition;
+    }
     LinkLineType::LinkDeclaration
 }
 
@@ -126,6 +129,17 @@ pub fn apply_variable(node: &str, variables: &mut HashMap<String, String>) -> St
     result
 }
 
+pub fn is_valid_condition(condition: &str, variables: &mut HashMap<String, String>) -> bool {
+    if condition.trim().to_ascii_lowercase().starts_with("not") {
+        return !is_valid_condition(&condition.chars().skip(3).collect::<String>(), variables);
+    }
+    let two_sides = condition
+        .split("==")
+        .map(|x| apply_variable(x.trim(), variables))
+        .collect::<Vec<String>>();
+    two_sides[0] == two_sides[1]
+}
+
 pub fn analyse_links_part(
     lines: &Vec<&str>,
     variables: &mut HashMap<String, String>,
@@ -184,7 +198,31 @@ pub fn analyse_links_part(
                     }
                 }
             }
-            _ => {}
+            LinkLineType::Condition => {
+                let condition = line.chars().skip(2).collect::<String>();
+                let is_valid = is_valid_condition(&condition, variables);
+                if !is_valid {
+                    continue;
+                }
+                let lines = lines
+                    .iter()
+                    .map(|&x| x)
+                    .skip(i + 1)
+                    .filter(|&x| x != ":")
+                    .collect::<Vec<&str>>();
+                let condition_indent = lines
+                    .iter()
+                    .skip(i)
+                    .next()
+                    .unwrap()
+                    .chars()
+                    .position(|x| x != ' ')
+                    .unwrap();
+                let condition_links = analyse_links_part(&lines, variables, condition_indent as u8);
+                for link in condition_links {
+                    links.push(link);
+                }
+            }
         }
     }
     links
@@ -394,6 +432,29 @@ mod tests {
     fn test3() {
         compile("./components/test3.bw");
         let mut map = init_map("./components/test3.bwc");
+        // init input 1 to 96 (0b01100000)
+        map.turn_on_lamp(6);
+        map.turn_on_lamp(7);
+        // init input 2 to 37 (0b00100101)
+        map.turn_on_lamp(9);
+        map.turn_on_lamp(11);
+        map.turn_on_lamp(14);
+        // check output is 133 (0b10000101)
+        map.apply_changes();
+        assert!(map.get_node(17).unwrap().is_on());
+        assert!(!map.get_node(18).unwrap().is_on());
+        assert!(map.get_node(19).unwrap().is_on());
+        assert!(!map.get_node(20).unwrap().is_on());
+        assert!(!map.get_node(21).unwrap().is_on());
+        assert!(!map.get_node(22).unwrap().is_on());
+        assert!(!map.get_node(23).unwrap().is_on());
+        assert!(map.get_node(24).unwrap().is_on());
+    }
+
+    #[test]
+    fn test4() {
+        compile("./components/test4.bw");
+        let mut map = init_map("./components/test4.bwc");
         // init input 1 to 96 (0b01100000)
         map.turn_on_lamp(6);
         map.turn_on_lamp(7);
