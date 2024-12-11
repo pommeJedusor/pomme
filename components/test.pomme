@@ -1,4 +1,4 @@
-# example adder component (adder.bw)
+# example adder component (adder.pomme)
 inputs:
 # first 8 bits input
 AA -> AH

@@ -47,7 +47,7 @@ mod tests {
 
     #[test]
     fn test_adder() {
-        let mut map = init_map("./components/adder.bwc");
+        let mut map = init_map("./components/adder.pc");
         // init input 1 to 96 (0b01100000)
         map.turn_on_lamp(6);
         map.turn_on_lamp(7);
@@ -69,7 +69,7 @@ mod tests {
 
     #[test]
     fn test_saver() {
-        let mut map = init_map("./components/saver.bwc");
+        let mut map = init_map("./components/saver.pc");
         // init input 1 to 96 (0b01100000)
         map.turn_on_lamp(6);
         map.turn_on_lamp(7);

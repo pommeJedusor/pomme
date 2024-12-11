@@ -2,6 +2,7 @@ use std::{
     collections::{HashMap, VecDeque},
     fs::{self, File},
     io::Write,
+    path::PathBuf,
 };
 
 enum LinkLineType {
@@ -372,7 +373,9 @@ pub fn compile(path: &str) {
         let line = format!("{} {} {}\n", index, requirements, links);
         content.push_str(&line);
     }
-    let mut file = File::create(format!("{path}c")).unwrap();
+    let mut path = PathBuf::from(path);
+    path.set_extension("pc");
+    let mut file = File::create(path.to_str().unwrap()).unwrap();
     let _ = file.write(&content.into_bytes());
 }
 
@@ -384,8 +387,8 @@ mod tests {
 
     #[test]
     fn test() {
-        compile("./components/test.bw");
-        let mut map = init_map("./components/test.bwc");
+        compile("./components/test.pomme");
+        let mut map = init_map("./components/test.pc");
         // init input 1 to 96 (0b01100000)
         map.turn_on_lamp(6);
         map.turn_on_lamp(7);
@@ -407,8 +410,8 @@ mod tests {
 
     #[test]
     fn test2() {
-        compile("./components/test2.bw");
-        let mut map = init_map("./components/test2.bwc");
+        compile("./components/test2.pomme");
+        let mut map = init_map("./components/test2.pc");
         // init input 1 to 96 (0b01100000)
         map.turn_on_lamp(6);
         map.turn_on_lamp(7);
@@ -430,8 +433,8 @@ mod tests {
 
     #[test]
     fn test3() {
-        compile("./components/test3.bw");
-        let mut map = init_map("./components/test3.bwc");
+        compile("./components/test3.pomme");
+        let mut map = init_map("./components/test3.pc");
         // init input 1 to 96 (0b01100000)
         map.turn_on_lamp(6);
         map.turn_on_lamp(7);
@@ -453,8 +456,8 @@ mod tests {
 
     #[test]
     fn test4() {
-        compile("./components/test4.bw");
-        let mut map = init_map("./components/test4.bwc");
+        compile("./components/test4.pomme");
+        let mut map = init_map("./components/test4.pc");
         // init input 1 to 96 (0b01100000)
         map.turn_on_lamp(6);
         map.turn_on_lamp(7);

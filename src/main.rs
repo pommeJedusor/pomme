@@ -1,7 +1,7 @@
-use binary_world::Graph;
-use binary_world::LogicBlock;
-use binary_world::Node;
-use binary_world::StoringBlock;
+use pomme::Graph;
+use pomme::LogicBlock;
+use pomme::Node;
+use pomme::StoringBlock;
 
 fn main() {
     /*

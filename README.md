@@ -1,4 +1,4 @@
-# BinaryWorld
+# P.O.M.M.E (Procedure oriented machine maker engine)
 
 ## the goal
 
