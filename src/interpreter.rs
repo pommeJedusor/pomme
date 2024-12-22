@@ -1,39 +1,68 @@
 use crate::{Graph, LogicBlock, Node, StoringBlock};
 use std::fs;
 
+fn get_logical_block_from_line(line: &str, i: usize) -> (Node, u32) {
+    let parameters = line.split_whitespace().collect::<Vec<&str>>();
+    assert!(
+        parameters.len() >= 2,
+        "line {i} is not valid:\n{line}\ndoesn't have enough parameters'"
+    );
+
+    let node_id = parameters[0].parse::<u32>().expect(&format!(
+        "line {i} is not valid:\n{line}\nexpected the first parameter to be an int (u32)"
+    ));
+
+    let requirements = u8::from_str_radix(parameters[1], 2).expect(&format!(
+                "line {i} is not valid:\n{line}\nexpected the second parameter to be a binary number with only 1 and 0"
+    ));
+
+    let children = parameters
+        .iter()
+        .skip(2)
+        .map(|x| x.parse::<u32>().expect(&format!("line {i} is not valid:\n{line}\nexpected all the child node parameters to be int (u32)")))
+        .collect();
+
+    let node = Node::LogicBlock(LogicBlock::new(requirements, children));
+    (node, node_id)
+}
+
+fn get_storing_block_from_line(line: &str, i: usize) -> (Node, u32) {
+    let parameters = line.split_whitespace().collect::<Vec<&str>>();
+    assert!(parameters.len() >= 3, "line {i} is not valid:\n{line}");
+
+    let node_id = parameters[0][1..].parse::<u32>().expect(&format!(
+        "line {i} is not valid:\n{line}\nexpected the first parameter to be an int (u32) (after the first ^)"
+    ));
+
+    let button = parameters[1].parse::<u32>().expect(&format!(
+        "line {i} is not valid:\n{line}\nexpected the first second to be an int (u32)"
+    ));
+
+    let source = parameters[2].parse::<u32>().expect(&format!(
+        "line {i} is not valid:\n{line}\nexpected the third parameter to be an int (u32)"
+    ));
+
+    let children = parameters
+        .iter()
+        .skip(3)
+        .map(|x| x.parse::<u32>().expect(&format!("line {i} is not valid:\n{line}\nexpected all the child node parameters to be int (u32)")))
+        .collect();
+
+    let node = Node::StoringBlock(StoringBlock::new(false, source, button, children));
+    (node, node_id)
+}
+
 pub fn init_map(path: &str) -> Graph {
     let contents = fs::read_to_string(path).expect(&format!("Failed to read the file: {}", path));
     let lines = contents.split("\n").filter(|x| x != &"");
     let mut nodes = Vec::new();
     for (i, line) in lines.enumerate() {
-        let parameters = line.split_whitespace().collect::<Vec<&str>>();
-
-        let is_logical_block = &parameters[0][0..=0] != "^";
-        if is_logical_block {
-            assert!(parameters.len() >= 2, "line {i} is not valid:\n{line}");
-            let node_id = parameters[0].parse::<u32>().unwrap();
-
-            let requirements = u8::from_str_radix(parameters[1], 2).unwrap();
-            let children = parameters
-                .iter()
-                .skip(2)
-                .map(|x| x.parse::<u32>().unwrap())
-                .collect();
-            let node = Node::LogicBlock(LogicBlock::new(requirements, children));
-            nodes.push((node, node_id));
-        } else {
-            assert!(parameters.len() >= 3, "line {i} is not valid:\n{line}");
-            let node_id = parameters[0][1..].parse::<u32>().unwrap();
-            let button = parameters[1].parse().unwrap();
-            let source = parameters[2].parse().unwrap();
-            let children = parameters
-                .iter()
-                .skip(3)
-                .map(|x| x.parse::<u32>().unwrap())
-                .collect();
-            let node = Node::StoringBlock(StoringBlock::new(false, source, button, children));
-            nodes.push((node, node_id));
-        }
+        let is_logical_block = &line[0..=0] != "^";
+        let node = match is_logical_block {
+            true => get_logical_block_from_line(line, i),
+            false => get_storing_block_from_line(line, i),
+        };
+        nodes.push(node);
     }
     let mut graph = Graph::new();
     graph.insert_nodes(nodes);
