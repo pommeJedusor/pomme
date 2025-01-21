@@ -3,197 +3,61 @@
 ## the goal
 
 The goal of this project is to developp a deep understanding of how computers work at the lowest level.
-This project will be inspire of people having create computers inside games like minecraft and others.
-I'm gonna do it a bit differently, I'll create my own 'game' which will be very simple it will be a 2D grid
-made of cells
+This project is inspired by people having create computers inside games like minecraft, Terraria and others.
+I'm gonna do it a bit differently, I'll create my own 'game' which will be very simple and focused on that purpose which will make it a lot easier to build, test and debug the machines, which are known to be big struggles with normal games, by using the pomme language and a component system
 
-## the rules
+## important concepts
+in this section I'll explain basically what does the program do regardless of the language
+so first of, it is a [graph](https://en.wikipedia.org/wiki/Graph_(discrete_mathematics)) more precisely a [directed](https://en.wikipedia.org/wiki/Graph_(discrete_mathematics)#Directed_graph) one made of two types of nodes: the *logical blocks* and the *storing blocks*, the former allow logic bitwise operations like *and*, *or* and *xor*. the latter will have as only purpose to store data you can see it at the ram or the ssd of a machine
 
-each cell will have four main parameters
-1. value
-this one is simply how much 'on' cells are powering the cell and it goes from 0 to 3 included
-e.g.
+### logical blocks
 
-|  |  |  |  |  |
-|--|--|--|--|--|
-|A |\<|B |\>|C |
-|^ |  |- |  |- |
-|D |\||0 |\||0 |
+each nodes has two states either **on** or **off** which is dependent on other nodes states
+so let's call a node *A* which have 'requirements' of 2 which means it will be **on** if and only if there is two nodes that are connected directly toward *A* that are **on**
 
-here will suppose that each '0' cell is off and each other is on  
-D and B are powering A so A has a value of 2  
-nobody is powering D nor B so D and B have a value of 0  
-B is powering C so C has a value of 1  
+a given node may have multiple requirements like 1 and 2 which will be the equivalent of a binary **or**
+they are two special kinds of blocks which are **lamps** and **rocks**
 
-2. requirements
-this one is a table to know if the cell is on relatively to its value
-e.g.
-A has requirements of 0b1111
-so it will be 'on' whatever its value is  
-B has requirements of 0b0001
-so it will be 'on' if and only if its value is 0  
-C has requirements of 0b0010
-so it will be 'on' if and only if its value is 1 (perfect for xor operations)  
-D has requirements of 0b0100
-so it will be 'on' if and only if its value is 2 (perfect for and operations)  
-E has requirements of 0b0110
-so it will be 'on' if and only if its value is 2 or 1 (perfect for or operations)  
+lamps have 0, 1, 2, 3 and 4 as requirements which means that whatever the states of the other nodes they are **always on** and
 
-3. is_storage
-this one is to know if it's a normal block or a storage block which have a totaly different structure and goal
-I'll describe those blocks later
+rocks as the opposite don't have any requirements and are **always off**, their purpose is to be changed by user input during the execution of the program by switching from rock to lamp or from lamp to rock
 
-4. is_on
-this one is simply to know if the block is on or off
-I don't strictly need it but the previous datas needed 7 bits so I add it
-because the last bit would have been unused anyway
+### storing blocks
 
+their purpose is to store data during the execution of the program, you can see it as a kind of ram
+each of those nodes will have two nodes toward them
+- button, if the button node is **off** then the storing block will keep its value regardless of everything else however if it's **on** it will **always** have the same value as its source node
+- source, as said previously this is the node from which the storing block will get its value from if and only if the button node is **on**
 
-### and
-|   |   |   |
-|---|---|---|
-|0  |\| |A  |
-|\- |   |v  |  
-|B  |>  |C  |
+## the pomme compiled language
 
+this language has the purpose of being easily understand by the program without having much to think about
 
-0 value_required = 0000  
-A value_required = 0010  
-B value_required = 0010  
-C value_required = 0100  
+though you'll probably use more the pomme language directly it is interesting to understand the compiled version first to better understand why things are how they are
 
-### or  
-|   |   |   |
-|---|---|---|
-|0  |\| |A  |
-|\- |   |v  |  
-|B  |>  |C  |
+files of this kind are store with the pc extension for pomme compiled
+```pc
+1 00000 3 4
+2 00000 3 4
+3 00100 5
+4 00110 5
+^5 3 4
+```
+now I'll explain the previous lines, the '1' is simply the index of the node, you could start at whatever you want like 42 for example
 
+the '00000' is the binary representation of the requirements the last zero being a boolean representing whether it should be **on** or **off** if there is zero node connected toward it that are **on**  
 
-0 value_required = 0000  
-A value_required = 0010  
-B value_required = 0010  
-C value_required = 0110  
+the 4th is the same but if there is one and only one 
 
-### xor
-|   |   |   |
-|---|---|---|
-|0  |\| |A  |
-|\- |   |v  |  
-|B  |>  |C  |
+the 3rd is the same if there is two and only two, you got the point
 
+the '3 4' space separated digits are the connection it means there that the node one is connected towards the node 3 and 4
 
-0 value_required = 0000  
-A value_required = 0010  
-B value_required = 0010  
-C value_required = 0010  
+to explain the example with what we saw the node 3 will only be on if the node 1 and 2 are on which means it's a binary 'and'
 
-### nand
-|   |   |   |
-|---|---|---|
-|0  |\| |A  |
-|\- |   |v  |  
-|B  |>  |C  |
+whereas the node 4 will be on if there is at least one of them that is on which means that it is a binary 'or'
 
+the node 5 is a storing block because it starts with a '^' and has as button node the node 3 and has as source the node 4, here it doesn't have any 'children' nodes but you can add the same way you would do for the logical blocks
 
-0 value_required = 0000  
-A value_required = 0010  
-B value_required = 0010  
-C value_required = 0011  
-
-
-
-### storing
-
-to store bit values there is storing block whose blocks start with a '^' as a convention
-and must be connect to two cells
-1. one with a '>' to get the value from (source)
-2. one with a '-' horizontally or '|' vertically to know if it should take the value (can only have one) (button)
-
-|    |    |    |
-|----|----|----|
-|AA  |\>  |^A  |
-|\-\-|\-\-|\|\||  
-|00  |\|  |AB  |
-
-
-^A will get the on/off of AA if and only if AB is on
-elsewise it will keep it's current on/off (0 by default)
-
-^A AA AB ^A  
-0  0  0  0  
-0  1  0  0  
-0  0  1  0  
-0  1  1  1  
-1  0  0  1  
-1  1  0  1  
-1  0  1  0  
-1  1  1  1  
-
-first ^A previous ^A on/off  
-AA AA on/off  
-AB AB on/off  
-last ^A new value of ^A  
-
-### portals
-to make complex structures possible when parts need to be able to
-interact with each other without being block by each other,
-there is portals
-they don't work with storage blocks if the connection is '|'
-you just need to write the name of the cell in lowercase and the power will be directly send to the cell
-avoid putting to much power on one cell, don't forget it can't hold a value higher than 3
-
-simple binary or
-
-A->H 8 bits input a  
-I->P 8 bits input b  
-Q->X 8 bits value_required 0110 output c  
-
-|   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-|A  |\| |B  |\| |C  |\| |D  |\| |E  |\| |F  |\| |G  |\| |H  |\| |I  |\| |J  |\| |K  |\| |L  |\| |M  |\| |N  |\| |O  |\| |P  |
-|v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |
-|q  |\| |r  |\| |s  |\| |t  |\| |u  |\| |v  |\| |w  |\| |x  |\| |Q  |\| |R  |\| |S  |\| |T  |\| |U  |\| |V  |\| |W  |\| |X  |
-
-
-the on/off of A go to q  
-q being a portal it goes to Q  
-the on/off of I go to q  
-Q having a value required of 0110 will only be on/off if it get one or two of power  
-so if A or I is true Q will be  
-it is the same for the 7 others bits  
-
-
-if we would to want it to store it:
-
-A->H 8 bits input a  
-I->P 8 bits input b  
-Q->X 8 bits value_required 0110 output c  
-
-|   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-|A  |\| |B  |\| |C  |\| |D  |\| |E  |\| |F  |\| |G  |\| |H  |\| |I  |\| |J  |\| |K  |\| |L  |\| |M  |\| |N  |\| |O  |\| |P  |
-|v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |
-|q  |\| |r  |\| |s  |\| |t  |\| |u  |\| |v  |\| |w  |\| |x  |\| |Q  |\| |R  |\| |S  |\| |T  |\| |U  |\| |V  |\| |W  |\| |X  |
-|\- |   |\- |   |\- |   |\- |   |\- |   |\- |   |\- |   |\- |   |\| |   |\| |   |\| |   |\| |   |\| |   |\| |   |\| |   |\| |
-|0  |\| |0  |\| |0  |\| |0  |\| |0  |\| |0  |\| |0  |\| |0  |\| |Z  |\| |Z  |\| |Z  |\| |Z  |\| |Z  |\| |Z  |\| |Z  |\| |Z  |
-
-
-if Z is true then the result will be stored otherwise it won't move
-
-the problem now is that it is hard to access those result values
-there is multiple solutions, I will show two of them
-the first one is to make the second input go through a portal too
-the second one is clone
-like I did we the Z, if two cells have the same name, they are the same cell
-so we could just do that:
-
-|   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-|A  |\| |B  |\| |C  |\| |D  |\| |E  |\| |F  |\| |G  |\| |H  |\| |I  |\| |J  |\| |K  |\| |L  |\| |M  |\| |N  |\| |O  |\| |P  |
-|v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |v  |
-|q  |\| |r  |\| |s  |\| |t  |\| |u  |\| |v  |\| |w  |\| |x  |\| |Q  |\| |R  |\| |S  |\| |T  |\| |U  |\| |V  |\| |W  |\| |X  |
-|\- |   |\- |   |\- |   |\- |   |\- |   |\- |   |\- |   |\- |   |\| |   |\| |   |\| |   |\| |   |\| |   |\| |   |\| |   |\| |
-|0  |\| |0  |\| |0  |\| |0  |\| |0  |\| |0  |\| |0  |\| |0  |\| |Z  |\| |Z  |\| |Z  |\| |Z  |\| |Z  |\| |Z  |\| |Z  |\| |Z  |
-|\- |   |\- |   |\- |   |\- |   |\- |   |\- |   |\- |   |\- |   |\- |   |\- |   |\- |   |\- |   |\- |   |\- |   |\- |   |\- |
-|Q  |\| |R  |\| |S  |\| |T  |\| |U  |\| |V  |\| |W  |\| |X  |0  |0  |0  |0  |0  |0  |0  |0  |0  |0  |0  |0  |0  |0  |0  |0  |
+## the pomme language
+this language is still under development so due to the high likely hood of big changes I'll wait until it becomes stable to make that part of the readme but you can still look in the components folder to find some example with the extension .pomme and try to understand how they work, you can also compare them with their compiled version in .pc
